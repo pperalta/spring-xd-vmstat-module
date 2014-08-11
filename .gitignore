@@ -1,0 +1,5 @@
+.gradle/
+build/
+spring-xd-vmstat-module.iml
+spring-xd-vmstat-module.ipr
+spring-xd-vmstat-module.iws
