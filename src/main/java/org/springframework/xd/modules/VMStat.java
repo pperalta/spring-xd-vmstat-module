@@ -25,7 +25,6 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -34,7 +33,7 @@ import org.slf4j.LoggerFactory;
 
 import org.springframework.integration.endpoint.MessageProducerSupport;
 import org.springframework.integration.support.MessageBuilder;
-import org.springframework.util.Assert;
+import org.springframework.scheduling.concurrent.CustomizableThreadFactory;
 import org.springframework.xd.tuple.TupleBuilder;
 
 /**
@@ -50,19 +49,8 @@ public class VMStat extends MessageProducerSupport {
 
 	private final CountDownLatch shutdownLatch = new CountDownLatch(1);
 
-//	private final ExecutorService executorService = Executors.newSingleThreadExecutor(new ThreadFactory() {
-//		@Override
-//		public Thread newThread(Runnable r) {
-//			Thread t = new Thread("vmstat");
-//			t.setDaemon(true);
-//
-//			logger.warn("Created vmstat thread");
-//
-//			return t;
-//		}
-//	});
-
-	private final ExecutorService executorService = Executors.newSingleThreadExecutor();
+	private final ExecutorService executorService =
+			Executors.newSingleThreadExecutor(new CustomizableThreadFactory("vmstat"));
 
 	public String getVmStatCommand() {
 		return vmStatCommand;
@@ -74,17 +62,22 @@ public class VMStat extends MessageProducerSupport {
 
 	@Override
 	protected void doStart() {
+		String os = System.getProperty("os.name");
+		if (!os.toLowerCase().contains("linux")) {
+			throw new UnsupportedOperationException("This module is only supported on Linux; OS detected: " + os);
+		}
+
 		if(running.compareAndSet(false, true)) {
-			logger.warn("Starting vmstat");
+			logger.info("Starting vmstat");
 			executorService.submit(new VMStatExecutor());
-			logger.warn("Started vmstat");
+			logger.info("Started vmstat");
 		}
 	}
 
 	@Override
 	protected void doStop() {
 		if (running.compareAndSet(true, false)) {
-			logger.warn("Stopping vmstat");
+			logger.info("Stopping vmstat");
 			running.set(false);
 			try {
 				shutdownLatch.await(5, TimeUnit.SECONDS);
@@ -95,7 +88,7 @@ public class VMStat extends MessageProducerSupport {
 			}
 			finally {
 				executorService.shutdown();
-				logger.warn("Stopped vmstat");
+				logger.info("Stopped vmstat");
 			}
 		}
 	}
@@ -105,7 +98,7 @@ public class VMStat extends MessageProducerSupport {
 
 		@Override
 		public Void call() throws Exception {
-			logger.warn("Starting vmstat loop");
+			logger.debug("Starting vmstat loop");
 			ProcessBuilder builder = new ProcessBuilder();
 			builder.redirectErrorStream(true);
 			builder.command(getVmStatCommand().split("\\s"));
@@ -117,7 +110,6 @@ public class VMStat extends MessageProducerSupport {
 
 				InputStreamReader in = new InputStreamReader(new BufferedInputStream(process.getInputStream()));
 				BufferedReader reader = new BufferedReader(in);
-//				String line;
 
 				while (running.get() && (line = reader.readLine()) != null) {
 					TupleBuilder tupleBuilder = TupleBuilder.tuple();
@@ -151,17 +143,16 @@ public class VMStat extends MessageProducerSupport {
 				}
 			}
 			catch (IOException e) {
-				logger.error("Exception caught", e);
-			}
-			catch (Throwable t) {
-				logger.error("wtf", t);
+				logger.error("Unhandled exception", e);
+				running.set(false);
 			}
 			finally {
 				if (process != null) {
 					process.destroy();
 				}
 				shutdownLatch.countDown();
-				logger.warn("Stopping vmstat loop, running: {}, line: {}", running, line);
+				logger.debug("Stopping vmstat loop");
+				logger.trace("running: {}, line: {}", running, line);
 			}
 
 			return null;
