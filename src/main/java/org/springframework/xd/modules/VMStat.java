@@ -25,15 +25,19 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import org.springframework.integration.endpoint.MessageProducerSupport;
 import org.springframework.integration.support.MessageBuilder;
-import org.springframework.xd.tuple.Tuple;
 import org.springframework.xd.tuple.TupleBuilder;
 
 /**
  * @author Patrick Peralta
  */
 public class VMStat extends MessageProducerSupport {
+
+	private final Logger logger = LoggerFactory.getLogger(getClass());
 
 	private volatile String vmstatCommand = "vmstat -n 1";
 
@@ -43,19 +47,6 @@ public class VMStat extends MessageProducerSupport {
 
 		@Override
 		public Void call() throws Exception {
-//			while (true) {
-//				TupleBuilder tupleBuilder = TupleBuilder.tuple();
-//				tupleBuilder.put("hello", "world");
-//				sendMessage(MessageBuilder.withPayload(tupleBuilder.build()).build());
-//
-//				try {
-//					Thread.sleep(1000);
-//				}
-//				catch (InterruptedException e) {
-//					throw new RuntimeException(e);
-//				}
-//			}
-
 			ProcessBuilder builder = new ProcessBuilder();
 			builder.redirectErrorStream(true);
 			builder.command(vmstatCommand.split("\\s"));
@@ -70,34 +61,33 @@ public class VMStat extends MessageProducerSupport {
 
 				while ((line = reader.readLine()) != null) {
 					TupleBuilder tupleBuilder = TupleBuilder.tuple();
-//					StringTokenizer tokenizer = new StringTokenizer(line);
+					StringTokenizer tokenizer = new StringTokenizer(line);
 
 					try {
-						tupleBuilder.put("ls", line);
-//						tupleBuilder.put("waitingProcessCount", Integer.parseInt(tokenizer.nextToken()))
-//								.put("sleepingProcessCount", Integer.parseInt(tokenizer.nextToken()))
-//								.put("virtualMemoryUsage", Long.parseLong(tokenizer.nextToken()))
-//								.put("freeMemory", Long.parseLong(tokenizer.nextToken()))
-//								.put("bufferMemory", Long.parseLong(tokenizer.nextToken()))
-//								.put("cacheMemory", Long.parseLong(tokenizer.nextToken()))
-//								.put("swapIn", Long.parseLong(tokenizer.nextToken()))
-//								.put("swapOut", Long.parseLong(tokenizer.nextToken()))
-//								.put("bytesIn", Long.parseLong(tokenizer.nextToken()))
-//								.put("bytesOut", Long.parseLong(tokenizer.nextToken()))
-//								.put("interruptsPerSecond", Long.parseLong(tokenizer.nextToken()))
-//								.put("contextSwitchesPerSecond", Long.parseLong(tokenizer.nextToken()))
-//								.put("userCpu", Long.parseLong(tokenizer.nextToken()))
-//								.put("kernelCpu", Long.parseLong(tokenizer.nextToken()))
-//								.put("idleCpu", Long.parseLong(tokenizer.nextToken()));
-
-						sendMessage(MessageBuilder.withPayload(tupleBuilder.build()).build());
+						tupleBuilder.put("waitingProcessCount", Integer.parseInt(tokenizer.nextToken()))
+								.put("sleepingProcessCount", Integer.parseInt(tokenizer.nextToken()))
+								.put("virtualMemoryUsage", Long.parseLong(tokenizer.nextToken()))
+								.put("freeMemory", Long.parseLong(tokenizer.nextToken()))
+								.put("bufferMemory", Long.parseLong(tokenizer.nextToken()))
+								.put("cacheMemory", Long.parseLong(tokenizer.nextToken()))
+								.put("swapIn", Long.parseLong(tokenizer.nextToken()))
+								.put("swapOut", Long.parseLong(tokenizer.nextToken()))
+								.put("bytesIn", Long.parseLong(tokenizer.nextToken()))
+								.put("bytesOut", Long.parseLong(tokenizer.nextToken()))
+								.put("interruptsPerSecond", Long.parseLong(tokenizer.nextToken()))
+								.put("contextSwitchesPerSecond", Long.parseLong(tokenizer.nextToken()))
+								.put("userCpu", Long.parseLong(tokenizer.nextToken()))
+								.put("kernelCpu", Long.parseLong(tokenizer.nextToken()))
+								.put("idleCpu", Long.parseLong(tokenizer.nextToken()));
 					}
 					catch (Exception e) {
 						// most likely cause is parsing a header line; discard and continue
 					}
+					sendMessage(MessageBuilder.withPayload(tupleBuilder.build()).build());
 				}
 			}
 			catch (IOException e) {
+				logger.error("Exception caught", e);
 			}
 			finally {
 				if (process != null) {
