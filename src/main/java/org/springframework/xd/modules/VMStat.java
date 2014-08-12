@@ -98,6 +98,7 @@ public class VMStat extends MessageProducerSupport {
 
 		@Override
 		public Void call() throws Exception {
+			logger.warn("Starting vmstat thread");
 			ProcessBuilder builder = new ProcessBuilder();
 			builder.redirectErrorStream(true);
 			builder.command(getVmStatCommand().split("\\s"));
