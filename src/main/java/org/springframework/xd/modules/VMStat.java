@@ -37,29 +37,102 @@ import org.springframework.scheduling.concurrent.CustomizableThreadFactory;
 import org.springframework.xd.tuple.TupleBuilder;
 
 /**
+ * Implementation of Spring Integration {@link MessageProducerSupport}
+ * that publishes <a href="http://en.wikipedia.org/wiki/Vmstat"><code>vmstat</code></a>
+ * output as Spring XD {@link org.springframework.xd.tuple.Tuple tuples}.
+ * The following fields are included:
+ * <ul>
+ *  <li>waitingProcessCount</li>
+ *  <li>sleepingProcessCount</li>
+ *  <li>virtualMemoryUsage</li>
+ *  <li>freeMemory</li>
+ *  <li>bufferMemory</li>
+ *  <li>cacheMemory</li>
+ *  <li>swapIn</li>
+ *  <li>bytesIn</li>
+ *  <li>bytesOut</li>
+ *  <li>interruptsPerSecond</li>
+ *  <li>contextSwitchesPerSecond</li>
+ *  <li>userCpu</li>
+ *  <li>kernelCpu</li>
+ *  <li>idleCpu</li>
+ *  </ul>
+ *  To deploy a simple stream:
+ *  <p>
+ *    <code>
+ *      stream create --name v --definition "vmstat|log"
+ *    </code>
+ *  </p>
+ *  To include a filter:
+ *  <p>
+ *    <code>
+ *      stream create --name v --definition "vmstat|filter --expression='payload.userCpu > 50'|log"
+ *    </code>
+ *  </p>
+ *
  * @author Patrick Peralta
  */
 public class VMStat extends MessageProducerSupport {
 
+	/**
+	 * The default {@code vmstat} command.
+	 */
+	public static final String DEFAULT_VM_STAT_COMMAND = "vmstat -n 1";
+
+	/**
+	 * Logger.
+	 */
 	private final Logger logger = LoggerFactory.getLogger(getClass());
 
-	private volatile String vmStatCommand = "vmstat -n 1";
+	/**
+	 * The {@code vmstat} command. This command <em>must</em> include
+	 * the {@code delay} parameter so that the program continues to
+	 * produce output (as opposed to exiting immediately). The
+	 * default value is "{@value #DEFAULT_VM_STAT_COMMAND}".
+	 */
+	private volatile String vmStatCommand = DEFAULT_VM_STAT_COMMAND;
 
+	/**
+	 * Flag that determines if the module is running. This is set
+	 * on {@link #doStart()} and is cleared on {@link #doStop()} or
+	 * if an exception occurs while processing the {@code vmstat}
+	 * output.
+	 */
 	private final AtomicBoolean running = new AtomicBoolean(false);
 
+	/**
+	 * Latch that is triggered when the module is no longer producing
+	 * output (either via explicit shutdown or error).
+	 */
 	private final CountDownLatch shutdownLatch = new CountDownLatch(1);
 
+	/**
+	 * Thread for executing and reading the output of {@code vmstat}.
+	 */
 	private final ExecutorService executorService =
 			Executors.newSingleThreadExecutor(new CustomizableThreadFactory("vmstat"));
 
+	/**
+	 * @see #vmStatCommand
+	 */
 	public String getVmStatCommand() {
 		return vmStatCommand;
 	}
 
+	/**
+	 * @see #vmStatCommand
+	 */
 	public void setVmStatCommand(String vmStatCommand) {
 		this.vmStatCommand = vmStatCommand;
 	}
 
+	/**
+	 * Start the thread that executes and processes the {@code vmstat}
+	 * output. This has no effect if the module is already running.
+	 *
+	 * @throws UnsupportedOperationException if this module is deployed
+	 *         on a non Linux operating system
+	 */
 	@Override
 	protected void doStart() {
 		String os = System.getProperty("os.name");
@@ -74,6 +147,11 @@ public class VMStat extends MessageProducerSupport {
 		}
 	}
 
+	/**
+	 * Stop the {@code vmstat} process and shut down the thread
+	 * processing its output. This has no effect if the module
+	 * is not running.
+	 */
 	@Override
 	protected void doStop() {
 		if (running.compareAndSet(true, false)) {
@@ -94,6 +172,9 @@ public class VMStat extends MessageProducerSupport {
 	}
 
 
+	/**
+	 * {@link Callable} that executes and processes {@code vmstat} output.
+	 */
 	public class VMStatExecutor implements Callable<Void> {
 
 		@Override
