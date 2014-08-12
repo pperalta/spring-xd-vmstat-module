@@ -111,12 +111,13 @@ public class VMStat extends MessageProducerSupport {
 			builder.command(getVmStatCommand().split("\\s"));
 
 			Process process = null;
+			String line = null;
 			try {
 				process = builder.start();
 
 				InputStreamReader in = new InputStreamReader(new BufferedInputStream(process.getInputStream()));
 				BufferedReader reader = new BufferedReader(in);
-				String line;
+//				String line;
 
 				while (running.get() && (line = reader.readLine()) != null) {
 					TupleBuilder tupleBuilder = TupleBuilder.tuple();
@@ -153,7 +154,7 @@ public class VMStat extends MessageProducerSupport {
 					process.destroy();
 				}
 				shutdownLatch.countDown();
-				logger.warn("Stopping vmstat loop, running: {}", running);
+				logger.warn("Stopping vmstat loop, running: {}, line: {}", running, line);
 			}
 
 			return null;
