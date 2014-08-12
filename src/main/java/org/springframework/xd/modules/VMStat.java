@@ -153,6 +153,9 @@ public class VMStat extends MessageProducerSupport {
 			catch (IOException e) {
 				logger.error("Exception caught", e);
 			}
+			catch (Throwable t) {
+				logger.error("wtf", t);
+			}
 			finally {
 				if (process != null) {
 					process.destroy();
