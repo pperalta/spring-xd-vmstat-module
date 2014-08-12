@@ -1,7 +1,7 @@
 Spring XD vmstat Module
 =======================
 
-Demo of Spring XD custom source module. This module **must** execute on Linux.
+Demo of Spring XD custom source module. This module is only supported on Linux.
 
 To build:
 
