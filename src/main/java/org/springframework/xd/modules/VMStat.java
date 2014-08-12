@@ -34,6 +34,7 @@ import org.slf4j.LoggerFactory;
 
 import org.springframework.integration.endpoint.MessageProducerSupport;
 import org.springframework.integration.support.MessageBuilder;
+import org.springframework.util.Assert;
 import org.springframework.xd.tuple.TupleBuilder;
 
 /**
@@ -45,7 +46,7 @@ public class VMStat extends MessageProducerSupport {
 
 	private volatile String vmStatCommand = "vmstat -n 1";
 
-	private final AtomicBoolean running = new AtomicBoolean();
+	private final AtomicBoolean running = new AtomicBoolean(false);
 
 	private final CountDownLatch shutdownLatch = new CountDownLatch(1);
 
@@ -69,22 +70,26 @@ public class VMStat extends MessageProducerSupport {
 
 	@Override
 	protected void doStart() {
-		running.set(true);
-		executorService.submit(new VMStatExecutor());
+		if(running.compareAndSet(false, true)) {
+			executorService.submit(new VMStatExecutor());
+			logger.warn("Started vmstat");
+		}
 	}
 
 	@Override
 	protected void doStop() {
-		running.set(false);
-		try {
-			shutdownLatch.await(5, TimeUnit.SECONDS);
-		}
-		catch (InterruptedException e) {
-			logger.warn("Interrupted while waiting for vmstat shutdown", e);
-			Thread.currentThread().interrupt();
-		}
-		finally {
-			executorService.shutdown();
+		if (running.compareAndSet(true, false)) {
+			running.set(false);
+			try {
+				shutdownLatch.await(5, TimeUnit.SECONDS);
+			}
+			catch (InterruptedException e) {
+				logger.warn("Interrupted while waiting for vmstat shutdown", e);
+				Thread.currentThread().interrupt();
+			}
+			finally {
+				executorService.shutdown();
+			}
 		}
 	}
 
