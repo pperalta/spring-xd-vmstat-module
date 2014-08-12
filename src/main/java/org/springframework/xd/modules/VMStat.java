@@ -142,8 +142,12 @@ public class VMStat extends MessageProducerSupport {
 					}
 					catch (Exception e) {
 						// most likely cause is parsing a header line; discard and continue
+						tupleBuilder = null;
 					}
-					sendMessage(MessageBuilder.withPayload(tupleBuilder.build()).build());
+
+					if (tupleBuilder != null) {
+						sendMessage(MessageBuilder.withPayload(tupleBuilder.build()).build());
+					}
 				}
 			}
 			catch (IOException e) {
