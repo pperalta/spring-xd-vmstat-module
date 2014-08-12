@@ -56,6 +56,8 @@ public class VMStat extends MessageProducerSupport {
 			Thread t = new Thread("vmstat");
 			t.setDaemon(true);
 
+			logger.warn("Created vmstat thread");
+
 			return t;
 		}
 	});
