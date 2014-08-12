@@ -145,6 +145,7 @@ public class VMStat extends MessageProducerSupport {
 					process.destroy();
 				}
 				shutdownLatch.countDown();
+				logger.warn("Shut down vmstat");
 			}
 
 			return null;
