@@ -75,6 +75,7 @@ public class VMStat extends MessageProducerSupport {
 	@Override
 	protected void doStart() {
 		if(running.compareAndSet(false, true)) {
+			logger.warn("Starting vmstat");
 			executorService.submit(new VMStatExecutor());
 			logger.warn("Started vmstat");
 		}
@@ -83,6 +84,7 @@ public class VMStat extends MessageProducerSupport {
 	@Override
 	protected void doStop() {
 		if (running.compareAndSet(true, false)) {
+			logger.warn("Stopping vmstat");
 			running.set(false);
 			try {
 				shutdownLatch.await(5, TimeUnit.SECONDS);
@@ -93,6 +95,7 @@ public class VMStat extends MessageProducerSupport {
 			}
 			finally {
 				executorService.shutdown();
+				logger.warn("Stopped vmstat");
 			}
 		}
 	}
@@ -102,7 +105,7 @@ public class VMStat extends MessageProducerSupport {
 
 		@Override
 		public Void call() throws Exception {
-			logger.warn("Starting vmstat thread");
+			logger.warn("Starting vmstat loop");
 			ProcessBuilder builder = new ProcessBuilder();
 			builder.redirectErrorStream(true);
 			builder.command(getVmStatCommand().split("\\s"));
@@ -150,7 +153,7 @@ public class VMStat extends MessageProducerSupport {
 					process.destroy();
 				}
 				shutdownLatch.countDown();
-				logger.warn("Shut down vmstat");
+				logger.warn("Stopping vmstat loop, running: {}", running);
 			}
 
 			return null;
