@@ -50,17 +50,19 @@ public class VMStat extends MessageProducerSupport {
 
 	private final CountDownLatch shutdownLatch = new CountDownLatch(1);
 
-	private final ExecutorService executorService = Executors.newSingleThreadExecutor(new ThreadFactory() {
-		@Override
-		public Thread newThread(Runnable r) {
-			Thread t = new Thread("vmstat");
-			t.setDaemon(true);
+//	private final ExecutorService executorService = Executors.newSingleThreadExecutor(new ThreadFactory() {
+//		@Override
+//		public Thread newThread(Runnable r) {
+//			Thread t = new Thread("vmstat");
+//			t.setDaemon(true);
+//
+//			logger.warn("Created vmstat thread");
+//
+//			return t;
+//		}
+//	});
 
-			logger.warn("Created vmstat thread");
-
-			return t;
-		}
-	});
+	private final ExecutorService executorService = Executors.newSingleThreadExecutor();
 
 	public String getVmStatCommand() {
 		return vmStatCommand;
