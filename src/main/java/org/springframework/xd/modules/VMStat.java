@@ -22,8 +22,12 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.StringTokenizer;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,9 +43,51 @@ public class VMStat extends MessageProducerSupport {
 
 	private final Logger logger = LoggerFactory.getLogger(getClass());
 
-	private volatile String vmstatCommand = "vmstat -n 1";
+	private volatile String vmStatCommand = "vmstat -n 1";
 
-	private final ExecutorService executorService = Executors.newSingleThreadExecutor();
+	private final AtomicBoolean running = new AtomicBoolean();
+
+	private final CountDownLatch shutdownLatch = new CountDownLatch(1);
+
+	private final ExecutorService executorService = Executors.newSingleThreadExecutor(new ThreadFactory() {
+		@Override
+		public Thread newThread(Runnable r) {
+			Thread t = new Thread("vmstat");
+			t.setDaemon(true);
+
+			return t;
+		}
+	});
+
+	public String getVmStatCommand() {
+		return vmStatCommand;
+	}
+
+	public void setVmStatCommand(String vmStatCommand) {
+		this.vmStatCommand = vmStatCommand;
+	}
+
+	@Override
+	protected void doStart() {
+		running.set(true);
+		executorService.submit(new VMStatExecutor());
+	}
+
+	@Override
+	protected void doStop() {
+		running.set(false);
+		try {
+			shutdownLatch.await(5, TimeUnit.SECONDS);
+		}
+		catch (InterruptedException e) {
+			logger.warn("Interrupted while waiting for vmstat shutdown", e);
+			Thread.currentThread().interrupt();
+		}
+		finally {
+			executorService.shutdown();
+		}
+	}
+
 
 	public class VMStatExecutor implements Callable<Void> {
 
@@ -49,7 +95,7 @@ public class VMStat extends MessageProducerSupport {
 		public Void call() throws Exception {
 			ProcessBuilder builder = new ProcessBuilder();
 			builder.redirectErrorStream(true);
-			builder.command(vmstatCommand.split("\\s"));
+			builder.command(getVmStatCommand().split("\\s"));
 
 			Process process = null;
 			try {
@@ -59,7 +105,7 @@ public class VMStat extends MessageProducerSupport {
 				BufferedReader reader = new BufferedReader(in);
 				String line;
 
-				while ((line = reader.readLine()) != null) {
+				while (running.get() && (line = reader.readLine()) != null) {
 					TupleBuilder tupleBuilder = TupleBuilder.tuple();
 					StringTokenizer tokenizer = new StringTokenizer(line);
 
@@ -93,19 +139,11 @@ public class VMStat extends MessageProducerSupport {
 				if (process != null) {
 					process.destroy();
 				}
+				shutdownLatch.countDown();
 			}
 
 			return null;
 		}
 	}
 
-	@Override
-	protected void doStart() {
-		executorService.submit(new VMStatExecutor());
-	}
-
-	@Override
-	protected void doStop() {
-		executorService.shutdown();
-	}
 }
